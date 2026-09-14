@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS HUD - GitHub</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #050b14;
+      color: #00f0ff;
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    video {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1);
+      pointer-events: none;
+    }
+    .hud-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      pointer-events: none;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-shadow: 0 0 10px #00f0ff;
+    }
+  </style>
+
+  <!-- MediaPipe Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <div id="container">
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output_canvas"></canvas>
+    <div class="hud-overlay">
+      <h2>SYSTEM: ONLINE</h2>
+      <p>J.A.R.V.I.S. INTERFACE V1.0</p>
+    </div>
+  </div>
+
+  <script>
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    let angle = 0;
+    const windowImg = new Image();
+    windowImg.src = 'https://images.unsplash.com/photo-1477959858617-67f30ac4ce09?q=80&w=600&auto=format&fit=crop';
+
+    function resizeCanvas() {
+      canvasElement.width = window.innerWidth;
+      canvasElement.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function onResults(results) {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      angle += 0.03;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        let handPositions = [];
+
+        for (const landmarks of results.multiHandLandmarks) {
+          // Centro della mano (palmo)
+          const palmX = landmarks[9].x * canvasElement.width;
+          const palmY = landmarks[9].y * canvasElement.height;
+          handPositions.push({ x: palmX, y: palmY });
+
+          // Disegna Cerchi Concentrici HUD
+          canvasCtx.save();
+          canvasCtx.translate(palmX, palmY);
+
+          // Anello Esterno Tratteggiato
+          canvasCtx.beginPath();
+          canvasCtx.arc(0, 0, 70, 0, 2 * Math.PI);
+          canvasCtx.strokeStyle = '#00f0ff';
+          canvasCtx.lineWidth = 2;
+          canvasCtx.setLineDash([8, 8]);
+          canvasCtx.stroke();
+
+          // Anello con Rotazione
+          canvasCtx.rotate(angle);
+          canvasCtx.beginPath();
+          canvasCtx.arc(0, 0, 85, 0, 1.5 * Math.PI);
+          canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+          canvasCtx.lineWidth = 3;
+          canvasCtx.setLineDash([]);
+          canvasCtx.stroke();
+
+          // Testo "J.A.R.V.I.S."
+          canvasCtx.fillStyle = '#00f0ff';
+          canvasCtx.font = '12px Courier New';
+          canvasCtx.fillText('J.A.R.V.I.S.', -35, -95);
+
+          // Linee di Puntamento
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(-100, 0); canvasCtx.lineTo(100, 0);
+          canvasCtx.moveTo(0, -100); canvasCtx.lineTo(0, 100);
+          canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
+          canvasCtx.lineWidth = 1;
+          canvasCtx.stroke();
+
+          canvasCtx.restore();
+        }
+
+        // Se ci sono due mani visibili, mostra la finestra olografica al centro
+        if (handPositions.length >= 2) {
+          const midX = (handPositions[0].x + handPositions[1].x) / 2;
+          const midY = (handPositions[0].y + handPositions[1].y) / 2;
+          const distance = Math.hypot(handPositions[0].x - handPositions[1].x, handPositions[0].y - handPositions[1].y);
+
+          const imgWidth = Math.max(150, distance);
+          const imgHeight = imgWidth * 0.65;
+
+          canvasCtx.save();
+          canvasCtx.globalAlpha = 0.85;
+          canvasCtx.strokeStyle = '#00f0ff';
+          canvasCtx.lineWidth = 4;
+          canvasCtx.strokeRect(midX - imgWidth / 2, midY - imgHeight / 2, imgWidth, imgHeight);
+          
+          if (windowImg.complete) {
+            canvasCtx.drawImage(windowImg, midX - imgWidth / 2, midY - imgHeight / 2, imgWidth, imgHeight);
+          }
+          canvasCtx.restore();
+        }
+      }
+
+      canvasCtx.restore();
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      },
+      width: 1280,
+      height: 720
+    });
+
+    camera.start();
+  </script>
+</body>
+</html>
