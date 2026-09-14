@@ -1,313 +1,1543 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>STARK MARK-LXXXV / J.A.R.V.I.S. OS</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background-color: #020509;
-      color: #00f0ff;
-      font-family: 'Consolas', 'Courier New', monospace;
-      overflow: hidden;
-      height: 100vh;
-      width: 100vw;
-    }
-    #wrapper {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-    }
-    #three-bg, #output_canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-    #output_canvas {
-      z-index: 10;
-      transform: scaleX(-1);
-    }
-    video {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-      opacity: 0.35;
-      filter: contrast(120%) brightness(80%) hue-rotate(180deg);
-    }
-    .hud-panel {
-      position: absolute;
-      z-index: 20;
-      padding: 12px;
-      border: 1px solid rgba(0, 240, 255, 0.4);
-      background: rgba(2, 10, 20, 0.65);
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
-      backdrop-filter: blur(4px);
-      pointer-events: none;
-      text-transform: uppercase;
-      font-size: 11px;
-      letter-spacing: 1px;
-    }
-    .top-left { top: 20px; left: 20px; border-left: 4px solid #00f0ff; }
-    .top-right { top: 20px; right: 20px; border-right: 4px solid #00f0ff; text-align: right; }
-    .bottom-left { bottom: 20px; left: 20px; border-left: 4px solid #00f0ff; }
-    .bottom-right { bottom: 20px; right: 20px; border-right: 4px solid #00f0ff; text-align: right; }
-    .hud-title { font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 0 8px #00f0ff; }
-    .status-ok { color: #00ff88; }
-    .bar-container { width: 100%; background: rgba(0, 240, 255, 0.1); height: 6px; margin-top: 5px; }
-    .bar-fill { height: 100%; background: #00f0ff; width: 0%; transition: width 0.1s linear; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<title>J.A.R.V.I.S. — AR SYSTEM</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+        crossorigin="anonymous"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+        crossorigin="anonymous"></script>
+
+<style>
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: "Consolas", "Courier New", monospace;
+}
+
+/* =========================================================
+   REAL CAMERA
+   ========================================================= */
+
+#webcam {
+    position: fixed;
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    transform: scaleX(-1);
+
+    z-index: 1;
+
+    background: #000;
+}
+
+
+/* =========================================================
+   AR CANVAS
+   ========================================================= */
+
+#arCanvas {
+    position: fixed;
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    z-index: 10;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   HOLOGRAM PANEL
+   ========================================================= */
+
+#hologram {
+
+    position: fixed;
+
+    width: 360px;
+    height: 235px;
+
+    left: 50%;
+    top: 50%;
+
+    z-index: 20;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transform:
+        translate(-50%, -50%)
+        scale(.55)
+        rotate(0deg);
+
+    transform-origin: center center;
+
+    transition:
+        opacity .18s ease;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(0, 235, 255, .12),
+            rgba(0, 120, 180, .035)
+        );
+
+    border: 1px solid rgba(0, 238, 255, .75);
+
+    box-shadow:
+        0 0 4px rgba(0, 238, 255, .8),
+        0 0 20px rgba(0, 238, 255, .25),
+        inset 0 0 35px rgba(0, 238, 255, .08);
+
+    backdrop-filter: blur(2px);
+
+    overflow: hidden;
+}
+
+#hologram.active {
+    opacity: .92;
+}
+
+
+/* image */
+
+#holoImage {
+
+    position: absolute;
+
+    inset: 9px;
+
+    width: calc(100% - 18px);
+    height: calc(100% - 18px);
+
+    object-fit: cover;
+
+    opacity: .58;
+
+    filter:
+        saturate(.75)
+        contrast(1.15)
+        brightness(.82);
+
+    mix-blend-mode: screen;
+}
+
+
+/* blue glass layer */
+
+#holoGlass {
+
+    position: absolute;
+
+    inset: 0;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(0,255,255,.05),
+            transparent 35%,
+            transparent 65%,
+            rgba(0,255,255,.04)
+        );
+
+    pointer-events: none;
+}
+
+
+/* scanlines */
+
+#holoScan {
+
+    position: absolute;
+
+    inset: 0;
+
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            transparent 0px,
+            transparent 3px,
+            rgba(0,240,255,.08) 4px
+        );
+
+    opacity: .65;
+
+    animation: scanMove 4s linear infinite;
+}
+
+@keyframes scanMove {
+
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: 0 120px;
+    }
+}
+
+
+/* =========================================================
+   CORNER BRACKETS
+   ========================================================= */
+
+.corner {
+
+    position: absolute;
+
+    width: 25px;
+    height: 25px;
+
+    border-color: #bfffff;
+
+    filter:
+        drop-shadow(0 0 5px #00eaff);
+}
+
+.corner.tl {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+}
+
+.corner.tr {
+    top: -1px;
+    right: -1px;
+    border-top: 2px solid;
+    border-right: 2px solid;
+}
+
+.corner.bl {
+    bottom: -1px;
+    left: -1px;
+    border-bottom: 2px solid;
+    border-left: 2px solid;
+}
+
+.corner.br {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 2px solid;
+    border-right: 2px solid;
+}
+
+
+/* =========================================================
+   HOLO INFORMATION
+   ========================================================= */
+
+.holoTop {
+
+    position: absolute;
+
+    top: 14px;
+    left: 18px;
+
+    color: #eaffff;
+
+    font-size: 9px;
+
+    letter-spacing: 2px;
+
+    text-shadow:
+        0 0 7px #00eaff;
+}
+
+.holoTop span {
+
+    color: #00eaff;
+
+    margin-left: 8px;
+}
+
+.holoBottom {
+
+    position: absolute;
+
+    bottom: 13px;
+    left: 18px;
+
+    color: rgba(170,245,255,.8);
+
+    font-size: 8px;
+
+    letter-spacing: 1.5px;
+}
+
+
+/* =========================================================
+   START SCREEN
+   ========================================================= */
+
+#startup {
+
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 100;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    background: #000;
+
+    transition:
+        opacity .5s ease;
+}
+
+#startup.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.startInner {
+
+    text-align: center;
+
+    color: #dfffff;
+}
+
+.startMain {
+
+    font-size: 15px;
+
+    letter-spacing: 7px;
+
+    margin-bottom: 16px;
+
+    text-shadow:
+        0 0 12px #00eaff;
+}
+
+.startSub {
+
+    font-size: 8px;
+
+    letter-spacing: 3px;
+
+    color: rgba(0,240,255,.65);
+
+    animation: pulseText 1.5s infinite;
+}
+
+@keyframes pulseText {
+
+    0%,
+    100% {
+        opacity: .35;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+
+/* =========================================================
+   SMALL SYSTEM STATUS
+   ========================================================= */
+
+#status {
+
+    position: fixed;
+
+    left: 24px;
+    bottom: 20px;
+
+    z-index: 30;
+
+    color: rgba(150,245,255,.55);
+
+    font-size: 8px;
+
+    letter-spacing: 2px;
+
+    opacity: 0;
+
+    transition: opacity .4s;
+}
+
+#status.active {
+    opacity: 1;
+}
+
+
+/* =========================================================
+   RESPONSIVE HOLOGRAM
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    #hologram {
+        width: 280px;
+        height: 185px;
+    }
+
+    .startMain {
+        font-size: 12px;
+        letter-spacing: 4px;
+    }
+}
+
+</style>
 </head>
+
+
 <body>
 
-  <div id="wrapper">
-    <video id="webcam" autoplay playsinline></video>
-    <div id="three-bg"></div>
-    <canvas id="output_canvas"></canvas>
 
-    <div class="hud-panel top-left">
-      <div class="hud-title">J.A.R.V.I.S. OS v8.5</div>
-      <div>CORE: <span class="status-ok">ONLINE</span></div>
-      <div>FPS: <span id="fps-val">60</span></div>
-      <div class="bar-container"><div id="cpu-bar" class="bar-fill"></div></div>
+<!-- =======================================================
+     REAL WORLD CAMERA
+     ======================================================= -->
+
+<video
+    id="webcam"
+    autoplay
+    playsinline
+    muted>
+</video>
+
+
+<!-- =======================================================
+     AR GRAPHICS
+     ======================================================= -->
+
+<canvas id="arCanvas"></canvas>
+
+
+<!-- =======================================================
+     HOLOGRAPHIC OBJECT
+     ======================================================= -->
+
+<div id="hologram">
+
+    <img
+        id="holoImage"
+        crossorigin="anonymous"
+        src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1000&auto=format&fit=crop">
+
+    <div id="holoGlass"></div>
+    <div id="holoScan"></div>
+
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="holoTop">
+        HOLOGRAPHIC DISPLAY
+        <span>ACTIVE</span>
     </div>
 
-    <div class="hud-panel top-right">
-      <div>TARGET TRACKING: ACTIVE</div>
-      <div>HANDS DETECTED: <span id="hands-count" style="color:#00f0ff;">0</span></div>
-      <div>GESTURE: <span id="gesture-name" style="color:#fff;">SEARCHING...</span></div>
+    <div class="holoBottom">
+        SYS 03 / VISUAL DATA / LINK ESTABLISHED
     </div>
 
-    <div class="hud-panel bottom-left">
-      <div>NEURAL LINK: ESTABLISHED</div>
-      <div>LATENCY: 12ms</div>
-      <div>MODE: HOLOGRAM INTERACTION</div>
+</div>
+
+
+<!-- =======================================================
+     STARTUP
+     ======================================================= -->
+
+<div id="startup">
+
+    <div class="startInner">
+
+        <div class="startMain">
+            J.A.R.V.I.S.
+        </div>
+
+        <div class="startSub">
+            INITIALIZING AUGMENTED REALITY SYSTEM
+        </div>
+
     </div>
 
-    <div class="hud-panel bottom-right">
-      <div>STARK INDUSTRIES HUD</div>
-      <div>SECURE CONNECTION</div>
-      <div id="clock">00:00:00</div>
-    </div>
-  </div>
+</div>
 
-  <script>
-    // --- 1. THREE.JS PARTICLES BACKGROUND ---
-    const bgContainer = document.getElementById('three-bg');
-    const scene = new THREE.Scene();
-    const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    bgContainer.appendChild(renderer.domElement);
 
-    const particleCount = 700;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
+<div id="status">
+    J.A.R.V.I.S. // AR LINK
+</div>
 
-    for (let i = 0; i < particleCount * 3; i++) {
-      positions[i] = (Math.random() - 0.5) * 10;
+
+<script>
+
+/* =========================================================
+   ELEMENTS
+   ========================================================= */
+
+const video =
+    document.getElementById("webcam");
+
+const canvas =
+    document.getElementById("arCanvas");
+
+const ctx =
+    canvas.getContext("2d");
+
+const hologram =
+    document.getElementById("hologram");
+
+const startup =
+    document.getElementById("startup");
+
+const status =
+    document.getElementById("status");
+
+
+/* =========================================================
+   STATE
+   ========================================================= */
+
+let detectedHands = [];
+
+let smoothHand = null;
+
+let smoothPanel = {
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+    scale: .8,
+    angle: 0
+};
+
+let targetPanel = {
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+    scale: .8,
+    angle: 0
+};
+
+let ringTime = 0;
+
+let lastDetectionTime = 0;
+
+let firstDetection = false;
+
+
+/* =========================================================
+   RESIZE
+   ========================================================= */
+
+function resizeCanvas() {
+
+    canvas.width =
+        window.innerWidth;
+
+    canvas.height =
+        window.innerHeight;
+}
+
+window.addEventListener(
+    "resize",
+    resizeCanvas
+);
+
+resizeCanvas();
+
+
+/* =========================================================
+   VIDEO → SCREEN COORDINATES
+   =========================================================
+
+   MediaPipe vede l'immagine originale.
+
+   La camera invece viene mostrata specchiata
+   e con object-fit: cover.
+
+   Questa funzione mantiene perfettamente
+   l'allineamento degli elementi AR.
+   ========================================================= */
+
+function landmarkToScreen(lm) {
+
+    const vw =
+        video.videoWidth || 1280;
+
+    const vh =
+        video.videoHeight || 720;
+
+    const cw =
+        canvas.width;
+
+    const ch =
+        canvas.height;
+
+
+    const scale =
+        Math.max(
+            cw / vw,
+            ch / vh
+        );
+
+
+    const rw =
+        vw * scale;
+
+    const rh =
+        vh * scale;
+
+
+    const offsetX =
+        (cw - rw) / 2;
+
+    const offsetY =
+        (ch - rh) / 2;
+
+
+    return {
+
+        x:
+            offsetX +
+            (1 - lm.x) * rw,
+
+        y:
+            offsetY +
+            lm.y * rh
+    };
+}
+
+
+/* =========================================================
+   DISTANCE
+   ========================================================= */
+
+function distance(a, b) {
+
+    return Math.hypot(
+        a.x - b.x,
+        a.y - b.y
+    );
+}
+
+
+/* =========================================================
+   ANGLE
+   ========================================================= */
+
+function angleBetween(a, b) {
+
+    return Math.atan2(
+        b.y - a.y,
+        b.x - a.x
+    );
+}
+
+
+/* =========================================================
+   RING
+   ========================================================= */
+
+function drawRing(
+    x,
+    y,
+    radius,
+    time
+) {
+
+    ctx.save();
+
+    ctx.translate(x, y);
+
+
+    /* ---------------------------------------------
+       GLOW
+       --------------------------------------------- */
+
+    ctx.shadowColor =
+        "rgba(0,240,255,.95)";
+
+    ctx.shadowBlur = 18;
+
+
+    /* ---------------------------------------------
+       MAIN CIRCLE
+       --------------------------------------------- */
+
+    ctx.beginPath();
+
+    ctx.arc(
+        0,
+        0,
+        radius,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.strokeStyle =
+        "rgba(0,235,255,.65)";
+
+    ctx.lineWidth = 1.5;
+
+    ctx.stroke();
+
+
+    /* ---------------------------------------------
+       OUTER BROKEN RING
+       --------------------------------------------- */
+
+    ctx.save();
+
+    ctx.rotate(time * .25);
+
+    ctx.beginPath();
+
+    ctx.arc(
+        0,
+        0,
+        radius + 13,
+        -0.35,
+        1.05
+    );
+
+    ctx.strokeStyle =
+        "rgba(0,245,255,.9)";
+
+    ctx.lineWidth = 2;
+
+    ctx.stroke();
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        0,
+        0,
+        radius + 13,
+        2.0,
+        3.25
+    );
+
+    ctx.strokeStyle =
+        "rgba(0,245,255,.7)";
+
+    ctx.lineWidth = 1;
+
+    ctx.stroke();
+
+    ctx.restore();
+
+
+    /* ---------------------------------------------
+       INNER ROTATING SEGMENTS
+       --------------------------------------------- */
+
+    ctx.save();
+
+    ctx.rotate(-time * .42);
+
+    for (let i = 0; i < 8; i++) {
+
+        const start =
+            i * (Math.PI * 2 / 8);
+
+        ctx.beginPath();
+
+        ctx.arc(
+            0,
+            0,
+            radius - 12,
+            start,
+            start + .28
+        );
+
+        ctx.strokeStyle =
+            i % 2 === 0
+            ? "rgba(140,255,255,.75)"
+            : "rgba(0,210,255,.35)";
+
+        ctx.lineWidth =
+            i % 2 === 0 ? 2 : 1;
+
+        ctx.stroke();
     }
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.03, transparent: true, opacity: 0.6 });
-    const particles = new THREE.Points(geometry, material);
-    scene.add(particles);
-    camera3D.position.z = 5;
+    ctx.restore();
 
-    function animateParticles() {
-      requestAnimationFrame(animateParticles);
-      particles.rotation.y += 0.001;
-      particles.rotation.x += 0.0005;
-      renderer.render(scene, camera3D);
-    }
-    animateParticles();
 
-    // --- 2. CANVASES & VARIABLES ---
-    const videoElement = document.getElementById('webcam');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    
-    let rotationAngle = 0;
-    let holoScale = 1;
-    let holoPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    
-    const holoImg = new Image();
-    holoImg.src = 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop';
+    /* ---------------------------------------------
+       TICKS
+       --------------------------------------------- */
 
-    function resize() {
-      canvasElement.width = window.innerWidth;
-      canvasElement.height = window.innerHeight;
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera3D.aspect = window.innerWidth / window.innerHeight;
-      camera3D.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', resize);
-    resize();
+    ctx.save();
 
-    // --- 3. HUD DRAWING HELPER FUNCTIONS ---
-    function drawAdvancedHUD(x, y, hand) {
-      canvasCtx.save();
-      canvasCtx.translate(x, y);
+    ctx.rotate(time * .12);
 
-      // Rotating Outer Ring
-      canvasCtx.save();
-      canvasCtx.rotate(rotationAngle);
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 90, 0, Math.PI * 1.5);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.8)';
-      canvasCtx.lineWidth = 2;
-      canvasCtx.setLineDash([10, 5, 2, 5]);
-      canvasCtx.stroke();
-      canvasCtx.restore();
+    for (let i = 0; i < 24; i++) {
 
-      // Counter Rotating Inner Ring
-      canvasCtx.save();
-      canvasCtx.rotate(-rotationAngle * 1.5);
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 65, 0, Math.PI * 2);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
-      canvasCtx.lineWidth = 1;
-      canvasCtx.setLineDash([4, 8]);
-      canvasCtx.stroke();
-      canvasCtx.restore();
+        const a =
+            i * Math.PI * 2 / 24;
 
-      // Center Node
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 8, 0, Math.PI * 2);
-      canvasCtx.fillStyle = '#00f0ff';
-      canvasCtx.fill();
+        const longTick =
+            i % 6 === 0;
 
-      // Text Labels
-      canvasCtx.fillStyle = '#00f0ff';
-      canvasCtx.font = '10px Consolas';
-      canvasCtx.fillText(`X:${Math.round(x)} Y:${Math.round(y)}`, 100, -20);
-      canvasCtx.fillText("J.A.R.V.I.S. LOCK", 100, -5);
+        const r1 =
+            radius + 18;
 
-      // Targeting Crosshair Lines
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(-120, 0); canvasCtx.lineTo(-70, 0);
-      canvasCtx.moveTo(70, 0); canvasCtx.lineTo(120, 0);
-      canvasCtx.moveTo(0, -120); canvasCtx.lineTo(0, -70);
-      canvasCtx.moveTo(0, 70); canvasCtx.lineTo(0, 120);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
-      canvasCtx.lineWidth = 1;
-      canvasCtx.stroke();
+        const r2 =
+            radius +
+            (longTick ? 28 : 23);
 
-      canvasCtx.restore();
+        ctx.beginPath();
+
+        ctx.moveTo(
+            Math.cos(a) * r1,
+            Math.sin(a) * r1
+        );
+
+        ctx.lineTo(
+            Math.cos(a) * r2,
+            Math.sin(a) * r2
+        );
+
+        ctx.strokeStyle =
+            longTick
+            ? "rgba(180,255,255,.8)"
+            : "rgba(0,220,255,.4)";
+
+        ctx.lineWidth =
+            longTick ? 1.5 : 1;
+
+        ctx.stroke();
     }
 
-    // --- 4. MEDIAPIPE HANDS PROCESSOR ---
-    function onResults(results) {
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    ctx.restore();
 
-      rotationAngle += 0.02;
-      const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-      document.getElementById('hands-count').innerText = handsCount;
 
-      if (handsCount > 0) {
-        let coords = [];
+    /* ---------------------------------------------
+       TARGET CROSS
+       --------------------------------------------- */
 
-        for (const landmarks of results.multiHandLandmarks) {
-          const wristX = landmarks[0].x * canvasElement.width;
-          const wristY = landmarks[0].y * canvasElement.height;
-          const indexX = landmarks[8].x * canvasElement.width;
-          const indexY = landmarks[8].y * canvasElement.height;
+    ctx.strokeStyle =
+        "rgba(190,255,255,.8)";
 
-          coords.push({ x: indexX, y: indexY });
+    ctx.lineWidth = 1;
 
-          // Draw Tracking HUD
-          drawAdvancedHUD(indexX, indexY, landmarks);
+    ctx.beginPath();
+
+    ctx.moveTo(-radius - 45, 0);
+    ctx.lineTo(-radius - 20, 0);
+
+    ctx.moveTo(radius + 20, 0);
+    ctx.lineTo(radius + 45, 0);
+
+    ctx.moveTo(0, -radius - 45);
+    ctx.lineTo(0, -radius - 20);
+
+    ctx.moveTo(0, radius + 20);
+    ctx.lineTo(0, radius + 45);
+
+    ctx.stroke();
+
+
+    /* ---------------------------------------------
+       CENTER
+       --------------------------------------------- */
+
+    ctx.shadowBlur = 12;
+
+    ctx.beginPath();
+
+    ctx.arc(
+        0,
+        0,
+        3,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle =
+        "#dfffff";
+
+    ctx.fill();
+
+
+    /* ---------------------------------------------
+       SWEEP
+       --------------------------------------------- */
+
+    const sweep =
+        time % (Math.PI * 2);
+
+    const gradient =
+        ctx.createLinearGradient(
+            0,
+            0,
+            Math.cos(sweep) * radius,
+            Math.sin(sweep) * radius
+        );
+
+    gradient.addColorStop(
+        0,
+        "rgba(0,240,255,0)"
+    );
+
+    gradient.addColorStop(
+        1,
+        "rgba(0,240,255,.55)"
+    );
+
+    ctx.strokeStyle =
+        gradient;
+
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+
+    ctx.moveTo(0, 0);
+
+    ctx.lineTo(
+        Math.cos(sweep) * radius,
+        Math.sin(sweep) * radius
+    );
+
+    ctx.stroke();
+
+
+    ctx.restore();
+}
+
+
+/* =========================================================
+   SMALL TECHNICAL DATA
+   ========================================================= */
+
+function drawTrackingText(
+    x,
+    y,
+    radius
+) {
+
+    ctx.save();
+
+    ctx.font =
+        "8px Consolas, monospace";
+
+    ctx.fillStyle =
+        "rgba(170,250,255,.72)";
+
+    ctx.shadowColor =
+        "#00eaff";
+
+    ctx.shadowBlur = 5;
+
+    ctx.letterSpacing = "1px";
+
+    ctx.fillText(
+        "J.A.R.V.I.S. // LOCK",
+        x + radius + 35,
+        y - 20
+    );
+
+    ctx.fillText(
+        "TRACKING",
+        x + radius + 35,
+        y - 7
+    );
+
+    ctx.fillStyle =
+        "rgba(0,230,255,.5)";
+
+    ctx.fillText(
+        "AR-03",
+        x + radius + 35,
+        y + 6
+    );
+
+    ctx.restore();
+}
+
+
+/* =========================================================
+   CONNECTION LINES
+   ========================================================= */
+
+function drawConnection(
+    a,
+    b
+) {
+
+    const midX =
+        (a.x + b.x) / 2;
+
+    const midY =
+        (a.y + b.y) / 2;
+
+
+    ctx.save();
+
+    ctx.shadowColor =
+        "#00eaff";
+
+    ctx.shadowBlur = 8;
+
+    ctx.strokeStyle =
+        "rgba(0,240,255,.35)";
+
+    ctx.lineWidth = 1;
+
+    ctx.setLineDash([
+        8,
+        10
+    ]);
+
+    ctx.beginPath();
+
+    ctx.moveTo(a.x, a.y);
+
+    ctx.lineTo(
+        midX,
+        midY
+    );
+
+    ctx.lineTo(b.x, b.y);
+
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+
+/* =========================================================
+   PANEL TARGET
+   ========================================================= */
+
+function calculatePanel() {
+
+    if (detectedHands.length < 2)
+        return;
+
+
+    const hand1 =
+        detectedHands[0];
+
+    const hand2 =
+        detectedHands[1];
+
+
+    const a =
+        landmarkToScreen(
+            hand1[8]
+        );
+
+    const b =
+        landmarkToScreen(
+            hand2[8]
+        );
+
+
+    const midX =
+        (a.x + b.x) / 2;
+
+    const midY =
+        (a.y + b.y) / 2;
+
+
+    const dist =
+        distance(a, b);
+
+
+    const rawScale =
+        dist / 330;
+
+
+    targetPanel.x =
+        midX;
+
+    targetPanel.y =
+        midY;
+
+
+    targetPanel.scale =
+        Math.max(
+            .55,
+            Math.min(
+                1.65,
+                rawScale
+            )
+        );
+
+
+    targetPanel.angle =
+        angleBetween(a, b);
+}
+
+
+/* =========================================================
+   SMOOTHING
+   ========================================================= */
+
+function smoothValue(
+    current,
+    target,
+    amount
+) {
+
+    return (
+        current +
+        (target - current) * amount
+    );
+}
+
+
+/* =========================================================
+   UPDATE HOLOGRAM
+   ========================================================= */
+
+function updateHologram() {
+
+    if (detectedHands.length < 2) {
+
+        hologram.classList.remove(
+            "active"
+        );
+
+        return;
+    }
+
+
+    smoothPanel.x =
+        smoothValue(
+            smoothPanel.x,
+            targetPanel.x,
+            .13
+        );
+
+
+    smoothPanel.y =
+        smoothValue(
+            smoothPanel.y,
+            targetPanel.y,
+            .13
+        );
+
+
+    smoothPanel.scale =
+        smoothValue(
+            smoothPanel.scale,
+            targetPanel.scale,
+            .12
+        );
+
+
+    let angleDifference =
+        targetPanel.angle -
+        smoothPanel.angle;
+
+
+    while (
+        angleDifference > Math.PI
+    ) {
+        angleDifference -=
+            Math.PI * 2;
+    }
+
+
+    while (
+        angleDifference < -Math.PI
+    ) {
+        angleDifference +=
+            Math.PI * 2;
+    }
+
+
+    smoothPanel.angle +=
+        angleDifference * .12;
+
+
+    hologram.style.transform =
+
+        `translate(-50%, -50%)
+         translate(${smoothPanel.x}px, ${smoothPanel.y}px)
+         scale(${smoothPanel.scale})
+         rotate(${smoothPanel.angle}rad)`;
+
+
+    hologram.classList.add(
+        "active"
+    );
+}
+
+
+/* =========================================================
+   MEDIAPIPE
+   ========================================================= */
+
+function onResults(results) {
+
+    detectedHands =
+        results.multiHandLandmarks || [];
+
+
+    if (detectedHands.length > 0) {
+
+        lastDetectionTime =
+            performance.now();
+
+
+        if (!firstDetection) {
+
+            firstDetection = true;
+
+            startup.classList.add(
+                "hidden"
+            );
+
+            status.classList.add(
+                "active"
+            );
         }
 
-        // Two Hands Interaction Logic
-        if (handsCount === 2) {
-          document.getElementById('gesture-name').innerText = "HOLOGRAM MANIPULATION";
 
-          const dist = Math.hypot(coords[0].x - coords[1].x, coords[0].y - coords[1].y);
-          holoPos.x = (coords[0].x + coords[1].x) / 2;
-          holoPos.y = (coords[0].y + coords[1].y) / 2;
-          holoScale = Math.max(0.5, dist / 250);
+        /* -----------------------------------------
+           PRIMARY HAND
+           ----------------------------------------- */
 
-          // Render Holographic Screen
-          const w = 350 * holoScale;
-          const h = 220 * holoScale;
+        const primary =
+            detectedHands[0];
 
-          canvasCtx.save();
-          canvasCtx.translate(holoPos.x, holoPos.y);
-          canvasCtx.globalAlpha = 0.85;
 
-          // Hologram Glow Effect
-          canvasCtx.shadowColor = "#00f0ff";
-          canvasCtx.shadowBlur = 20;
+        const wrist =
+            landmarkToScreen(
+                primary[0]
+            );
 
-          // Border Frame
-          canvasCtx.strokeStyle = "#00f0ff";
-          canvasCtx.lineWidth = 3;
-          canvasCtx.strokeRect(-w / 2, -h / 2, w, h);
+        const index =
+            landmarkToScreen(
+                primary[8]
+            );
 
-          // Image Content
-          if (holoImg.complete) {
-            canvasCtx.drawImage(holoImg, -w / 2, -h / 2, w, h);
-          }
+        const middle =
+            landmarkToScreen(
+                primary[12]
+            );
 
-          // Corner Brackets
-          const bSize = 15;
-          canvasCtx.strokeStyle = "#ffffff";
-          canvasCtx.lineWidth = 2;
-          canvasCtx.strokeRect(-w/2 - 5, -h/2 - 5, bSize, bSize);
-          canvasCtx.strokeRect(w/2 + 5 - bSize, h/2 + 5 - bSize, bSize, bSize);
+        const palmSize =
+            distance(
+                wrist,
+                middle
+            );
 
-          canvasCtx.restore();
+
+        const radius =
+            Math.max(
+                70,
+                Math.min(
+                    170,
+                    palmSize * 1.55
+                )
+            );
+
+
+        /* smooth primary hand */
+
+        if (!smoothHand) {
+
+            smoothHand = {
+                x: index.x,
+                y: index.y,
+                radius
+            };
+
         } else {
-          document.getElementById('gesture-name').innerText = "TRACKING SINGLE HAND";
-        }
-      } else {
-        document.getElementById('gesture-name').innerText = "SEARCHING TARGET...";
-      }
 
-      canvasCtx.restore();
+            smoothHand.x =
+                smoothValue(
+                    smoothHand.x,
+                    index.x,
+                    .22
+                );
+
+            smoothHand.y =
+                smoothValue(
+                    smoothHand.y,
+                    index.y,
+                    .22
+                );
+
+            smoothHand.radius =
+                smoothValue(
+                    smoothHand.radius,
+                    radius,
+                    .16
+                );
+        }
+
+
+        calculatePanel();
+
+    } else {
+
+        /* slowly remove target */
+
+        smoothHand = null;
+    }
+}
+
+
+/* =========================================================
+   RENDER LOOP
+   ========================================================= */
+
+function render() {
+
+    requestAnimationFrame(
+        render
+    );
+
+
+    ringTime += .018;
+
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    /* -----------------------------------------------------
+       PRIMARY HAND RING
+       ----------------------------------------------------- */
+
+    if (smoothHand) {
+
+        drawRing(
+            smoothHand.x,
+            smoothHand.y,
+            smoothHand.radius,
+            ringTime
+        );
+
+
+        drawTrackingText(
+            smoothHand.x,
+            smoothHand.y,
+            smoothHand.radius
+        );
     }
 
-    // --- 5. INITIALIZATION & TIMERS ---
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+
+    /* -----------------------------------------------------
+       TWO HAND MODE
+       ----------------------------------------------------- */
+
+    if (
+        detectedHands.length >= 2
+    ) {
+
+        const a =
+            landmarkToScreen(
+                detectedHands[0][8]
+            );
+
+        const b =
+            landmarkToScreen(
+                detectedHands[1][8]
+            );
+
+
+        drawConnection(
+            a,
+            b
+        );
+
+
+        /* finger lock points */
+
+        ctx.save();
+
+        for (const p of [a, b]) {
+
+            ctx.shadowColor =
+                "#00eaff";
+
+            ctx.shadowBlur = 10;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                p.x,
+                p.y,
+                3,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fillStyle =
+                "#eaffff";
+
+            ctx.fill();
+
+            ctx.beginPath();
+
+            ctx.arc(
+                p.x,
+                p.y,
+                10,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.strokeStyle =
+                "rgba(0,240,255,.55)";
+
+            ctx.lineWidth = 1;
+
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+
+    /* -----------------------------------------------------
+       HOLOGRAM
+       ----------------------------------------------------- */
+
+    updateHologram();
+
+
+    /* -----------------------------------------------------
+       LOST TRACKING
+       ----------------------------------------------------- */
+
+    if (
+        performance.now() -
+        lastDetectionTime > 700
+    ) {
+
+        hologram.classList.remove(
+            "active"
+        );
+    }
+}
+
+
+/* =========================================================
+   MEDIAPIPE INITIALIZATION
+   ========================================================= */
+
+const hands =
+    new Hands({
+
+        locateFile:
+            (file) =>
+                `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
 
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7
-    });
 
-    hands.onResults(onResults);
+hands.setOptions({
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
-      },
-      width: 1280,
-      height: 720
-    });
+    maxNumHands: 2,
 
-    camera.start();
+    modelComplexity: 1,
 
-    // UI Updates
-    setInterval(() => {
-      const now = new Date();
-      document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
-      document.getElementById('cpu-bar').style.width = Math.floor(Math.random() * 40 + 50) + '%';
-    }, 1000);
-  </script>
+    minDetectionConfidence: .72,
+
+    minTrackingConfidence: .72
+
+});
+
+
+hands.onResults(
+    onResults
+);
+
+
+/* =========================================================
+   CAMERA
+   ========================================================= */
+
+const camera =
+    new Camera(
+        video,
+        {
+
+            onFrame:
+                async () => {
+
+                    await hands.send({
+                        image: video
+                    });
+
+                },
+
+            width: 1280,
+
+            height: 720
+
+        }
+    );
+
+
+/* =========================================================
+   START
+   ========================================================= */
+
+camera.start();
+
+render();
+
+
+/* =========================================================
+   CAMERA READY
+   ========================================================= */
+
+video.addEventListener(
+    "loadeddata",
+    () => {
+
+        setTimeout(
+            () => {
+
+                if (!firstDetection) {
+
+                    startup.classList.add(
+                        "hidden"
+                    );
+
+                    status.classList.add(
+                        "active"
+                    );
+                }
+
+            },
+            1800
+        );
+
+    }
+);
+
+</script>
+
 </body>
 </html>
