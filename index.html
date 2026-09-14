@@ -1,313 +1,475 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>STARK MARK-LXXXV / J.A.R.V.I.S. OS</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background-color: #020509;
-      color: #00f0ff;
-      font-family: 'Consolas', 'Courier New', monospace;
-      overflow: hidden;
-      height: 100vh;
-      width: 100vw;
-    }
-    #wrapper {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-    }
-    #three-bg, #output_canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-    #output_canvas {
-      z-index: 10;
-      transform: scaleX(-1);
-    }
-    video {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-      opacity: 0.35;
-      filter: contrast(120%) brightness(80%) hue-rotate(180deg);
-    }
-    .hud-panel {
-      position: absolute;
-      z-index: 20;
-      padding: 12px;
-      border: 1px solid rgba(0, 240, 255, 0.4);
-      background: rgba(2, 10, 20, 0.65);
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
-      backdrop-filter: blur(4px);
-      pointer-events: none;
-      text-transform: uppercase;
-      font-size: 11px;
-      letter-spacing: 1px;
-    }
-    .top-left { top: 20px; left: 20px; border-left: 4px solid #00f0ff; }
-    .top-right { top: 20px; right: 20px; border-right: 4px solid #00f0ff; text-align: right; }
-    .bottom-left { bottom: 20px; left: 20px; border-left: 4px solid #00f0ff; }
-    .bottom-right { bottom: 20px; right: 20px; border-right: 4px solid #00f0ff; text-align: right; }
-    .hud-title { font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 0 8px #00f0ff; }
-    .status-ok { color: #00ff88; }
-    .bar-container { width: 100%; background: rgba(0, 240, 255, 0.1); height: 6px; margin-top: 5px; }
-    .bar-fill { height: 100%; background: #00f0ff; width: 0%; transition: width 0.1s linear; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>STARK // J.A.R.V.I.S. OS V2</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-</head>
-<body>
+<style>
+:root{
+  --cyan:#00f0ff;
+  --cyan2:#00aaff;
+  --blue:#087cff;
+  --green:#00ff88;
+  --red:#ff3155;
+  --yellow:#ffe600;
+  --white:#eaffff;
+  --bg:#010408;
+  --panel:rgba(2,12,22,.68);
+  --line:rgba(0,240,255,.25);
+}
 
-  <div id="wrapper">
-    <video id="webcam" autoplay playsinline></video>
-    <div id="three-bg"></div>
-    <canvas id="output_canvas"></canvas>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
 
-    <div class="hud-panel top-left">
-      <div class="hud-title">J.A.R.V.I.S. OS v8.5</div>
-      <div>CORE: <span class="status-ok">ONLINE</span></div>
-      <div>FPS: <span id="fps-val">60</span></div>
-      <div class="bar-container"><div id="cpu-bar" class="bar-fill"></div></div>
-    </div>
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#010307;
+}
 
-    <div class="hud-panel top-right">
-      <div>TARGET TRACKING: ACTIVE</div>
-      <div>HANDS DETECTED: <span id="hands-count" style="color:#00f0ff;">0</span></div>
-      <div>GESTURE: <span id="gesture-name" style="color:#fff;">SEARCHING...</span></div>
-    </div>
+body{
+  color:var(--cyan);
+  font-family:
+    "Consolas",
+    "Courier New",
+    monospace;
+  user-select:none;
+  cursor:crosshair;
+}
 
-    <div class="hud-panel bottom-left">
-      <div>NEURAL LINK: ESTABLISHED</div>
-      <div>LATENCY: 12ms</div>
-      <div>MODE: HOLOGRAM INTERACTION</div>
-    </div>
+/* =========================================================
+   CORE
+========================================================= */
 
-    <div class="hud-panel bottom-right">
-      <div>STARK INDUSTRIES HUD</div>
-      <div>SECURE CONNECTION</div>
-      <div id="clock">00:00:00</div>
-    </div>
-  </div>
+#app{
+  position:relative;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(0,80,120,.08),
+      transparent 55%
+    ),
+    #010307;
+}
 
-  <script>
-    // --- 1. THREE.JS PARTICLES BACKGROUND ---
-    const bgContainer = document.getElementById('three-bg');
-    const scene = new THREE.Scene();
-    const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    bgContainer.appendChild(renderer.domElement);
+canvas,
+video{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
 
-    const particleCount = 700;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
+#webcam{
+  object-fit:cover;
+  transform:scaleX(-1);
+  opacity:.24;
+  filter:
+    contrast(140%)
+    brightness(65%)
+    saturate(60%)
+    hue-rotate(155deg);
+}
 
-    for (let i = 0; i < particleCount * 3; i++) {
-      positions[i] = (Math.random() - 0.5) * 10;
-    }
+#backgroundCanvas{
+  z-index:1;
+}
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.03, transparent: true, opacity: 0.6 });
-    const particles = new THREE.Points(geometry, material);
-    scene.add(particles);
-    camera3D.position.z = 5;
+#fxCanvas{
+  z-index:5;
+  pointer-events:none;
+}
 
-    function animateParticles() {
-      requestAnimationFrame(animateParticles);
-      particles.rotation.y += 0.001;
-      particles.rotation.x += 0.0005;
-      renderer.render(scene, camera3D);
-    }
-    animateParticles();
+#hudCanvas{
+  z-index:10;
+  pointer-events:none;
+}
 
-    // --- 2. CANVASES & VARIABLES ---
-    const videoElement = document.getElementById('webcam');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    
-    let rotationAngle = 0;
-    let holoScale = 1;
-    let holoPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    
-    const holoImg = new Image();
-    holoImg.src = 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop';
+#webcam{
+  z-index:2;
+}
 
-    function resize() {
-      canvasElement.width = window.innerWidth;
-      canvasElement.height = window.innerHeight;
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera3D.aspect = window.innerWidth / window.innerHeight;
-      camera3D.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', resize);
-    resize();
+/* =========================================================
+   SCANLINES
+========================================================= */
 
-    // --- 3. HUD DRAWING HELPER FUNCTIONS ---
-    function drawAdvancedHUD(x, y, hand) {
-      canvasCtx.save();
-      canvasCtx.translate(x, y);
+#scanlines{
+  position:absolute;
+  inset:0;
+  z-index:50;
+  pointer-events:none;
+  opacity:.14;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0,240,255,.12) 3px,
+      transparent 4px
+    );
+  mix-blend-mode:screen;
+}
 
-      // Rotating Outer Ring
-      canvasCtx.save();
-      canvasCtx.rotate(rotationAngle);
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 90, 0, Math.PI * 1.5);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.8)';
-      canvasCtx.lineWidth = 2;
-      canvasCtx.setLineDash([10, 5, 2, 5]);
-      canvasCtx.stroke();
-      canvasCtx.restore();
+#vignette{
+  position:absolute;
+  inset:0;
+  z-index:51;
+  pointer-events:none;
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 45%,
+      rgba(0,0,0,.42) 100%
+    );
+}
 
-      // Counter Rotating Inner Ring
-      canvasCtx.save();
-      canvasCtx.rotate(-rotationAngle * 1.5);
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 65, 0, Math.PI * 2);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
-      canvasCtx.lineWidth = 1;
-      canvasCtx.setLineDash([4, 8]);
-      canvasCtx.stroke();
-      canvasCtx.restore();
+/* =========================================================
+   TOP BAR
+========================================================= */
 
-      // Center Node
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 8, 0, Math.PI * 2);
-      canvasCtx.fillStyle = '#00f0ff';
-      canvasCtx.fill();
+#topBar{
+  position:absolute;
+  z-index:100;
+  top:0;
+  left:0;
+  right:0;
+  height:58px;
 
-      // Text Labels
-      canvasCtx.fillStyle = '#00f0ff';
-      canvasCtx.font = '10px Consolas';
-      canvasCtx.fillText(`X:${Math.round(x)} Y:${Math.round(y)}`, 100, -20);
-      canvasCtx.fillText("J.A.R.V.I.S. LOCK", 100, -5);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
 
-      // Targeting Crosshair Lines
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(-120, 0); canvasCtx.lineTo(-70, 0);
-      canvasCtx.moveTo(70, 0); canvasCtx.lineTo(120, 0);
-      canvasCtx.moveTo(0, -120); canvasCtx.lineTo(0, -70);
-      canvasCtx.moveTo(0, 70); canvasCtx.lineTo(0, 120);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
-      canvasCtx.lineWidth = 1;
-      canvasCtx.stroke();
+  padding:0 25px;
 
-      canvasCtx.restore();
-    }
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0,15,28,.92),
+      rgba(0,8,15,.55)
+    );
 
-    // --- 4. MEDIAPIPE HANDS PROCESSOR ---
-    function onResults(results) {
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  border-bottom:1px solid var(--line);
 
-      rotationAngle += 0.02;
-      const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
-      document.getElementById('hands-count').innerText = handsCount;
+  box-shadow:
+    0 0 30px rgba(0,240,255,.08);
+}
 
-      if (handsCount > 0) {
-        let coords = [];
+.logo{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
 
-        for (const landmarks of results.multiHandLandmarks) {
-          const wristX = landmarks[0].x * canvasElement.width;
-          const wristY = landmarks[0].y * canvasElement.height;
-          const indexX = landmarks[8].x * canvasElement.width;
-          const indexY = landmarks[8].y * canvasElement.height;
+.logoCore{
+  width:28px;
+  height:28px;
+  border:2px solid var(--cyan);
+  border-radius:50%;
+  position:relative;
+  box-shadow:
+    0 0 8px var(--cyan),
+    inset 0 0 8px var(--cyan);
+}
 
-          coords.push({ x: indexX, y: indexY });
+.logoCore::before,
+.logoCore::after{
+  content:"";
+  position:absolute;
+  background:var(--cyan);
+}
 
-          // Draw Tracking HUD
-          drawAdvancedHUD(indexX, indexY, landmarks);
-        }
+.logoCore::before{
+  width:100%;
+  height:1px;
+  top:50%;
+  left:0;
+}
 
-        // Two Hands Interaction Logic
-        if (handsCount === 2) {
-          document.getElementById('gesture-name').innerText = "HOLOGRAM MANIPULATION";
+.logoCore::after{
+  width:1px;
+  height:100%;
+  top:0;
+  left:50%;
+}
 
-          const dist = Math.hypot(coords[0].x - coords[1].x, coords[0].y - coords[1].y);
-          holoPos.x = (coords[0].x + coords[1].x) / 2;
-          holoPos.y = (coords[0].y + coords[1].y) / 2;
-          holoScale = Math.max(0.5, dist / 250);
+.logoText{
+  font-size:15px;
+  letter-spacing:4px;
+  color:white;
+  text-shadow:0 0 10px var(--cyan);
+}
 
-          // Render Holographic Screen
-          const w = 350 * holoScale;
-          const h = 220 * holoScale;
+.logoSub{
+  color:var(--cyan);
+  font-size:9px;
+  letter-spacing:2px;
+}
 
-          canvasCtx.save();
-          canvasCtx.translate(holoPos.x, holoPos.y);
-          canvasCtx.globalAlpha = 0.85;
+.topStatus{
+  display:flex;
+  align-items:center;
+  gap:22px;
+  font-size:10px;
+  letter-spacing:1px;
+}
 
-          // Hologram Glow Effect
-          canvasCtx.shadowColor = "#00f0ff";
-          canvasCtx.shadowBlur = 20;
+.statusDot{
+  display:inline-block;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 10px var(--green);
+  margin-right:6px;
+}
 
-          // Border Frame
-          canvasCtx.strokeStyle = "#00f0ff";
-          canvasCtx.lineWidth = 3;
-          canvasCtx.strokeRect(-w / 2, -h / 2, w, h);
+/* =========================================================
+   HUD PANELS
+========================================================= */
 
-          // Image Content
-          if (holoImg.complete) {
-            canvasCtx.drawImage(holoImg, -w / 2, -h / 2, w, h);
-          }
+.panel{
+  position:absolute;
+  z-index:80;
+  min-width:190px;
+  padding:13px 15px;
 
-          // Corner Brackets
-          const bSize = 15;
-          canvasCtx.strokeStyle = "#ffffff";
-          canvasCtx.lineWidth = 2;
-          canvasCtx.strokeRect(-w/2 - 5, -h/2 - 5, bSize, bSize);
-          canvasCtx.strokeRect(w/2 + 5 - bSize, h/2 + 5 - bSize, bSize, bSize);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(0,25,40,.72),
+      rgba(0,5,12,.62)
+    );
 
-          canvasCtx.restore();
-        } else {
-          document.getElementById('gesture-name').innerText = "TRACKING SINGLE HAND";
-        }
-      } else {
-        document.getElementById('gesture-name').innerText = "SEARCHING TARGET...";
-      }
+  border:1px solid rgba(0,240,255,.28);
 
-      canvasCtx.restore();
-    }
+  box-shadow:
+    0 0 20px rgba(0,240,255,.08),
+    inset 0 0 20px rgba(0,240,255,.025);
 
-    // --- 5. INITIALIZATION & TIMERS ---
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
+  backdrop-filter:blur(7px);
 
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7
-    });
+  font-size:10px;
+  line-height:1.7;
+  letter-spacing:1px;
 
-    hands.onResults(onResults);
+  clip-path:
+    polygon(
+      0 0,
+      calc(100% - 12px) 0,
+      100% 12px,
+      100% 100%,
+      12px 100%,
+      0 calc(100% - 12px)
+    );
+}
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
-      },
-      width: 1280,
-      height: 720
-    });
+.panel::before{
+  content:"";
+  position:absolute;
+  top:-1px;
+  left:0;
+  width:35%;
+  height:2px;
+  background:var(--cyan);
+  box-shadow:0 0 10px var(--cyan);
+}
 
-    camera.start();
+.panelTitle{
+  color:white;
+  font-weight:bold;
+  font-size:12px;
+  letter-spacing:2px;
+  margin-bottom:5px;
+  text-shadow:0 0 8px var(--cyan);
+}
 
-    // UI Updates
-    setInterval(() => {
-      const now = new Date();
-      document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
-      document.getElementById('cpu-bar').style.width = Math.floor(Math.random() * 40 + 50) + '%';
-    }, 1000);
-  </script>
-</body>
-</html>
+.green{
+  color:var(--green);
+}
+
+.yellow{
+  color:var(--yellow);
+}
+
+.red{
+  color:var(--red);
+}
+
+.white{
+  color:white;
+}
+
+.dim{
+  color:rgba(0,240,255,.55);
+}
+
+.value{
+  float:right;
+  color:white;
+}
+
+#panelSystem{
+  top:78px;
+  left:20px;
+}
+
+#panelTracking{
+  top:78px;
+  right:20px;
+  text-align:right;
+}
+
+#panelTelemetry{
+  bottom:80px;
+  left:20px;
+}
+
+#panelMission{
+  bottom:80px;
+  right:20px;
+  text-align:right;
+}
+
+/* =========================================================
+   CENTER CORE
+========================================================= */
+
+#core{
+  position:absolute;
+  z-index:30;
+  left:50%;
+  top:50%;
+  width:250px;
+  height:250px;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+
+.coreRing{
+  position:absolute;
+  inset:0;
+  border:1px solid rgba(0,240,255,.18);
+  border-radius:50%;
+  animation:spin 14s linear infinite;
+}
+
+.coreRing:nth-child(2){
+  inset:25px;
+  border-style:dashed;
+  animation-duration:9s;
+  animation-direction:reverse;
+}
+
+.coreRing:nth-child(3){
+  inset:58px;
+  border-color:rgba(0,240,255,.35);
+  animation-duration:5s;
+}
+
+.coreCenter{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:18px;
+  height:18px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:white;
+  box-shadow:
+    0 0 10px white,
+    0 0 25px var(--cyan),
+    0 0 60px var(--cyan);
+  animation:pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
+
+@keyframes pulse{
+  50%{
+    transform:translate(-50%,-50%) scale(.55);
+    opacity:.6;
+  }
+}
+
+/* =========================================================
+   BOTTOM COMMAND BAR
+========================================================= */
+
+#commandBar{
+  position:absolute;
+  z-index:110;
+  bottom:15px;
+  left:50%;
+  transform:translateX(-50%);
+
+  width:min(680px,80vw);
+  height:35px;
+
+  display:flex;
+  align-items:center;
+
+  border:1px solid rgba(0,240,255,.35);
+  background:rgba(0,8,16,.8);
+
+  box-shadow:0 0 20px rgba(0,240,255,.08);
+}
+
+#prompt{
+  padding:0 10px;
+  color:var(--green);
+}
+
+#commandInput{
+  flex:1;
+  height:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:white;
+  font-family:inherit;
+  font-size:11px;
+  letter-spacing:1px;
+}
+
+#commandInput::placeholder{
+  color:rgba(0,240,255,.35);
+}
+
+/* =========================================================
+   NOTIFICATIONS
+========================================================= */
+
+#notifications{
+  position:absolute;
+  z-index:200;
+  top:75px;
+  left:50%;
+  transform:translateX(-50%);
+  width:330px;
+  pointer-events:none;
+}
+
+.notification{
+  margin-bottom:7px;
+  padding:9px 13px;
+
+  background:rgba(0,15,25,.85);
+  border-left:3px solid var(--cyan);
+
+  box-shadow:
+    0 0 20px rgba(0,240,255,.12);
+
+  font-size:10px;
+  animation:
+    notifyIn .25s ease-out,
+    notifyOut .4s ease-in 3.
