@@ -3,27 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JARVIS HUD - GitHub</title>
+  <title>STARK MARK-LXXXV / J.A.R.V.I.S. OS</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background-color: #050b14;
+      background-color: #020509;
       color: #00f0ff;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Consolas', 'Courier New', monospace;
       overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       height: 100vh;
+      width: 100vw;
     }
-    #container {
+    #wrapper {
       position: relative;
       width: 100vw;
       height: 100vh;
+    }
+    #three-bg, #output_canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    #output_canvas {
+      z-index: 10;
+      transform: scaleX(-1);
     }
     video {
       position: absolute;
@@ -31,135 +37,248 @@
       height: 100%;
       object-fit: cover;
       transform: scaleX(-1);
+      opacity: 0.35;
+      filter: contrast(120%) brightness(80%) hue-rotate(180deg);
     }
-    canvas {
+    .hud-panel {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      transform: scaleX(-1);
+      z-index: 20;
+      padding: 12px;
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      background: rgba(2, 10, 20, 0.65);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+      backdrop-filter: blur(4px);
       pointer-events: none;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 1px;
     }
-    .hud-overlay {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      pointer-events: none;
-      font-weight: bold;
-      letter-spacing: 2px;
-      text-shadow: 0 0 10px #00f0ff;
-    }
+    .top-left { top: 20px; left: 20px; border-left: 4px solid #00f0ff; }
+    .top-right { top: 20px; right: 20px; border-right: 4px solid #00f0ff; text-align: right; }
+    .bottom-left { bottom: 20px; left: 20px; border-left: 4px solid #00f0ff; }
+    .bottom-right { bottom: 20px; right: 20px; border-right: 4px solid #00f0ff; text-align: right; }
+    .hud-title { font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 0 8px #00f0ff; }
+    .status-ok { color: #00ff88; }
+    .bar-container { width: 100%; background: rgba(0, 240, 255, 0.1); height: 6px; margin-top: 5px; }
+    .bar-fill { height: 100%; background: #00f0ff; width: 0%; transition: width 0.1s linear; }
   </style>
 
-  <!-- MediaPipe Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-  <div id="container">
+  <div id="wrapper">
     <video id="webcam" autoplay playsinline></video>
+    <div id="three-bg"></div>
     <canvas id="output_canvas"></canvas>
-    <div class="hud-overlay">
-      <h2>SYSTEM: ONLINE</h2>
-      <p>J.A.R.V.I.S. INTERFACE V1.0</p>
+
+    <div class="hud-panel top-left">
+      <div class="hud-title">J.A.R.V.I.S. OS v8.5</div>
+      <div>CORE: <span class="status-ok">ONLINE</span></div>
+      <div>FPS: <span id="fps-val">60</span></div>
+      <div class="bar-container"><div id="cpu-bar" class="bar-fill"></div></div>
+    </div>
+
+    <div class="hud-panel top-right">
+      <div>TARGET TRACKING: ACTIVE</div>
+      <div>HANDS DETECTED: <span id="hands-count" style="color:#00f0ff;">0</span></div>
+      <div>GESTURE: <span id="gesture-name" style="color:#fff;">SEARCHING...</span></div>
+    </div>
+
+    <div class="hud-panel bottom-left">
+      <div>NEURAL LINK: ESTABLISHED</div>
+      <div>LATENCY: 12ms</div>
+      <div>MODE: HOLOGRAM INTERACTION</div>
+    </div>
+
+    <div class="hud-panel bottom-right">
+      <div>STARK INDUSTRIES HUD</div>
+      <div>SECURE CONNECTION</div>
+      <div id="clock">00:00:00</div>
     </div>
   </div>
 
   <script>
+    // --- 1. THREE.JS PARTICLES BACKGROUND ---
+    const bgContainer = document.getElementById('three-bg');
+    const scene = new THREE.Scene();
+    const camera3D = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    bgContainer.appendChild(renderer.domElement);
+
+    const particleCount = 700;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount * 3; i++) {
+      positions[i] = (Math.random() - 0.5) * 10;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.03, transparent: true, opacity: 0.6 });
+    const particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+    camera3D.position.z = 5;
+
+    function animateParticles() {
+      requestAnimationFrame(animateParticles);
+      particles.rotation.y += 0.001;
+      particles.rotation.x += 0.0005;
+      renderer.render(scene, camera3D);
+    }
+    animateParticles();
+
+    // --- 2. CANVASES & VARIABLES ---
     const videoElement = document.getElementById('webcam');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
+    
+    let rotationAngle = 0;
+    let holoScale = 1;
+    let holoPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    
+    const holoImg = new Image();
+    holoImg.src = 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop';
 
-    let angle = 0;
-    const windowImg = new Image();
-    windowImg.src = 'https://images.unsplash.com/photo-1477959858617-67f30ac4ce09?q=80&w=600&auto=format&fit=crop';
-
-    function resizeCanvas() {
+    function resize() {
       canvasElement.width = window.innerWidth;
       canvasElement.height = window.innerHeight;
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera3D.aspect = window.innerWidth / window.innerHeight;
+      camera3D.updateProjectionMatrix();
     }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    window.addEventListener('resize', resize);
+    resize();
 
+    // --- 3. HUD DRAWING HELPER FUNCTIONS ---
+    function drawAdvancedHUD(x, y, hand) {
+      canvasCtx.save();
+      canvasCtx.translate(x, y);
+
+      // Rotating Outer Ring
+      canvasCtx.save();
+      canvasCtx.rotate(rotationAngle);
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, 90, 0, Math.PI * 1.5);
+      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.8)';
+      canvasCtx.lineWidth = 2;
+      canvasCtx.setLineDash([10, 5, 2, 5]);
+      canvasCtx.stroke();
+      canvasCtx.restore();
+
+      // Counter Rotating Inner Ring
+      canvasCtx.save();
+      canvasCtx.rotate(-rotationAngle * 1.5);
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, 65, 0, Math.PI * 2);
+      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+      canvasCtx.lineWidth = 1;
+      canvasCtx.setLineDash([4, 8]);
+      canvasCtx.stroke();
+      canvasCtx.restore();
+
+      // Center Node
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, 8, 0, Math.PI * 2);
+      canvasCtx.fillStyle = '#00f0ff';
+      canvasCtx.fill();
+
+      // Text Labels
+      canvasCtx.fillStyle = '#00f0ff';
+      canvasCtx.font = '10px Consolas';
+      canvasCtx.fillText(`X:${Math.round(x)} Y:${Math.round(y)}`, 100, -20);
+      canvasCtx.fillText("J.A.R.V.I.S. LOCK", 100, -5);
+
+      // Targeting Crosshair Lines
+      canvasCtx.beginPath();
+      canvasCtx.moveTo(-120, 0); canvasCtx.lineTo(-70, 0);
+      canvasCtx.moveTo(70, 0); canvasCtx.lineTo(120, 0);
+      canvasCtx.moveTo(0, -120); canvasCtx.lineTo(0, -70);
+      canvasCtx.moveTo(0, 70); canvasCtx.lineTo(0, 120);
+      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
+      canvasCtx.lineWidth = 1;
+      canvasCtx.stroke();
+
+      canvasCtx.restore();
+    }
+
+    // --- 4. MEDIAPIPE HANDS PROCESSOR ---
     function onResults(results) {
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      angle += 0.03;
+      rotationAngle += 0.02;
+      const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+      document.getElementById('hands-count').innerText = handsCount;
 
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        let handPositions = [];
+      if (handsCount > 0) {
+        let coords = [];
 
         for (const landmarks of results.multiHandLandmarks) {
-          // Centro della mano (palmo)
-          const palmX = landmarks[9].x * canvasElement.width;
-          const palmY = landmarks[9].y * canvasElement.height;
-          handPositions.push({ x: palmX, y: palmY });
+          const wristX = landmarks[0].x * canvasElement.width;
+          const wristY = landmarks[0].y * canvasElement.height;
+          const indexX = landmarks[8].x * canvasElement.width;
+          const indexY = landmarks[8].y * canvasElement.height;
 
-          // Disegna Cerchi Concentrici HUD
-          canvasCtx.save();
-          canvasCtx.translate(palmX, palmY);
+          coords.push({ x: indexX, y: indexY });
 
-          // Anello Esterno Tratteggiato
-          canvasCtx.beginPath();
-          canvasCtx.arc(0, 0, 70, 0, 2 * Math.PI);
-          canvasCtx.strokeStyle = '#00f0ff';
-          canvasCtx.lineWidth = 2;
-          canvasCtx.setLineDash([8, 8]);
-          canvasCtx.stroke();
-
-          // Anello con Rotazione
-          canvasCtx.rotate(angle);
-          canvasCtx.beginPath();
-          canvasCtx.arc(0, 0, 85, 0, 1.5 * Math.PI);
-          canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
-          canvasCtx.lineWidth = 3;
-          canvasCtx.setLineDash([]);
-          canvasCtx.stroke();
-
-          // Testo "J.A.R.V.I.S."
-          canvasCtx.fillStyle = '#00f0ff';
-          canvasCtx.font = '12px Courier New';
-          canvasCtx.fillText('J.A.R.V.I.S.', -35, -95);
-
-          // Linee di Puntamento
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(-100, 0); canvasCtx.lineTo(100, 0);
-          canvasCtx.moveTo(0, -100); canvasCtx.lineTo(0, 100);
-          canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
-          canvasCtx.lineWidth = 1;
-          canvasCtx.stroke();
-
-          canvasCtx.restore();
+          // Draw Tracking HUD
+          drawAdvancedHUD(indexX, indexY, landmarks);
         }
 
-        // Se ci sono due mani visibili, mostra la finestra olografica al centro
-        if (handPositions.length >= 2) {
-          const midX = (handPositions[0].x + handPositions[1].x) / 2;
-          const midY = (handPositions[0].y + handPositions[1].y) / 2;
-          const distance = Math.hypot(handPositions[0].x - handPositions[1].x, handPositions[0].y - handPositions[1].y);
+        // Two Hands Interaction Logic
+        if (handsCount === 2) {
+          document.getElementById('gesture-name').innerText = "HOLOGRAM MANIPULATION";
 
-          const imgWidth = Math.max(150, distance);
-          const imgHeight = imgWidth * 0.65;
+          const dist = Math.hypot(coords[0].x - coords[1].x, coords[0].y - coords[1].y);
+          holoPos.x = (coords[0].x + coords[1].x) / 2;
+          holoPos.y = (coords[0].y + coords[1].y) / 2;
+          holoScale = Math.max(0.5, dist / 250);
+
+          // Render Holographic Screen
+          const w = 350 * holoScale;
+          const h = 220 * holoScale;
 
           canvasCtx.save();
+          canvasCtx.translate(holoPos.x, holoPos.y);
           canvasCtx.globalAlpha = 0.85;
-          canvasCtx.strokeStyle = '#00f0ff';
-          canvasCtx.lineWidth = 4;
-          canvasCtx.strokeRect(midX - imgWidth / 2, midY - imgHeight / 2, imgWidth, imgHeight);
-          
-          if (windowImg.complete) {
-            canvasCtx.drawImage(windowImg, midX - imgWidth / 2, midY - imgHeight / 2, imgWidth, imgHeight);
+
+          // Hologram Glow Effect
+          canvasCtx.shadowColor = "#00f0ff";
+          canvasCtx.shadowBlur = 20;
+
+          // Border Frame
+          canvasCtx.strokeStyle = "#00f0ff";
+          canvasCtx.lineWidth = 3;
+          canvasCtx.strokeRect(-w / 2, -h / 2, w, h);
+
+          // Image Content
+          if (holoImg.complete) {
+            canvasCtx.drawImage(holoImg, -w / 2, -h / 2, w, h);
           }
+
+          // Corner Brackets
+          const bSize = 15;
+          canvasCtx.strokeStyle = "#ffffff";
+          canvasCtx.lineWidth = 2;
+          canvasCtx.strokeRect(-w/2 - 5, -h/2 - 5, bSize, bSize);
+          canvasCtx.strokeRect(w/2 + 5 - bSize, h/2 + 5 - bSize, bSize, bSize);
+
           canvasCtx.restore();
+        } else {
+          document.getElementById('gesture-name').innerText = "TRACKING SINGLE HAND";
         }
+      } else {
+        document.getElementById('gesture-name').innerText = "SEARCHING TARGET...";
       }
 
       canvasCtx.restore();
     }
 
+    // --- 5. INITIALIZATION & TIMERS ---
     const hands = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
@@ -167,8 +286,8 @@
     hands.setOptions({
       maxNumHands: 2,
       modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.7
     });
 
     hands.onResults(onResults);
@@ -182,6 +301,13 @@
     });
 
     camera.start();
+
+    // UI Updates
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
+      document.getElementById('cpu-bar').style.width = Math.floor(Math.random() * 40 + 50) + '%';
+    }, 1000);
   </script>
 </body>
 </html>
